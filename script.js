@@ -24,7 +24,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const inputElement = document.getElementById(inputId);
 
             if (inputElement && inputElement.value.trim() !== '') {
-                await addanswer(question, inputElement.value.trim());
+                await addanswer(removeAccents(question.trim().toLocaleLowerCase()), inputElement.value.trim()); // Normalize the new answer
                 inputElement.value = ''; // Clear the input after sending
             }
         }
@@ -40,9 +40,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
             await dislikeAnswer(question);
         }
-        // You can add logic here for like/dislike buttons if needed
-        // if (e.target.classList.contains('like-btn')) { ... }
-        // if (e.target.classList.contains('dislike-btn')) { ... }
     });
 
     affichageReponseContainer.addEventListener('keypress', async (e) => {
@@ -60,17 +57,67 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 async function likeAnswer(question) {
-    await supabaseClient
+    const { data, error } = await supabaseClient
         .from('informations')
-        .update({ likes: supabaseClient.raw('likes + 1') })
-        .eq('question', question);
+        .select('likes')
+        .eq('question', question)
+        .single();
+
+    if (error) {
+        console.error("Erreur lors de la récupération des likes :", error);
+        return;
+    }
+    else if (data) {
+        console.log("Nombre actuel de likes :", data.likes);
+        await supabaseClient
+            .from('informations')
+            .update({ likes: data.likes + 1 })
+            .eq('question', question);
+        console.log("Like ajouté avec succès ! Nouveau nombre de likes :", data.likes + 1);
+    }
+
+    await validationAnswer(question);
 }
 
 async function dislikeAnswer(question) {
-    await supabaseClient
+    const { data, error } = await supabaseClient
         .from('informations')
-        .update({ dislikes: supabaseClient.raw('dislikes + 1') })
-        .eq('question', question);
+        .select('dislikes')
+        .eq('question', question)
+        .single();
+
+    if (error) {
+        console.error("Erreur lors de la récupération des dislikes :", error);
+        return;
+    }
+    else if (data) {
+        console.log("Nombre actuel de dislikes :", data.dislikes);
+        await supabaseClient
+            .from('informations')
+            .update({ dislikes: data.dislikes + 1 })
+            .eq('question', question);
+        console.log("Dislike ajouté avec succès ! Nouveau nombre de dislikes :", data.dislikes + 1);
+    }
+
+    await validationAnswer(question);
+}
+
+async function validationAnswer(question) {
+    const { data, error } = await supabaseClient
+        .from('informations')
+        .select('likes, dislikes')
+        .eq('question', question)
+        .single();
+
+    if (data) {
+        const { likes, dislikes } = data;
+        const totalVotes = likes + dislikes;
+        const validation = totalVotes > 0 && (likes / totalVotes) >= 0.6; // Validation si au moins 60% de likes
+        await supabaseClient
+            .from('informations')
+            .update({ validation: validation })
+            .eq('question', question);
+    }
 }
 
 async function addanswer(question, newreponse) {
@@ -91,7 +138,8 @@ async function addanswer(question, newreponse) {
 async function generate_answer() {
     let question = inputQuestionElement.value; // Use the cached element
 
-    const rechercheNettoyee = question.toLowerCase().trim();
+    const rechercheNettoyee = removeAccents(question.toLowerCase().trim()).toLowerCase(); // Normalize the question for searching);
+    console.log("Question nettoyée pour la recherche :", rechercheNettoyee);
 
     affichageQuestion(question);
     inputQuestionElement.value = ''; // Clear the main input after sending
@@ -113,6 +161,18 @@ async function generate_answer() {
     } else {
         displayChat("Désolé, je n'ai pas trouvé de réponse à cette question.", question);
     }
+}
+
+function removeAccents(str) {
+    if (typeof str !== 'string') {
+        throw new TypeError('Le paramètre doit être une chaîne de caractères.');
+    }
+
+    // Normalisation Unicode : décompose les caractères accentués
+    // puis supprime les marques diacritiques
+    return str
+        .normalize('NFD') // Décompose les caractères accentués
+        .replace(/[\u0300-\u036f]/g, ''); // Supprime les diacritiques
 }
 
 function displayChat(reponse, question) {
