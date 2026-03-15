@@ -28,6 +28,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 inputElement.value = ''; // Clear the input after sending
             }
         }
+
+        if (e.target.classList.contains('like-btn')) {
+            const question = decodeURIComponent(e.target.dataset.question);
+
+            await likeAnswer(question);
+        }
+
+        if (e.target.classList.contains('dislike-btn')) {
+            const question = decodeURIComponent(e.target.dataset.question);
+
+            await dislikeAnswer(question);
+        }
         // You can add logic here for like/dislike buttons if needed
         // if (e.target.classList.contains('like-btn')) { ... }
         // if (e.target.classList.contains('dislike-btn')) { ... }
@@ -46,6 +58,20 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 });
+
+async function likeAnswer(question) {
+    await supabaseClient
+        .from('informations')
+        .update({ likes: supabaseClient.raw('likes + 1') })
+        .eq('question', question);
+}
+
+async function dislikeAnswer(question) {
+    await supabaseClient
+        .from('informations')
+        .update({ dislikes: supabaseClient.raw('dislikes + 1') })
+        .eq('question', question);
+}
 
 async function addanswer(question, newreponse) {
     console.log(`Ajout de réponse pour la question : "${question}" avec la réponse : "${newreponse}"`);
