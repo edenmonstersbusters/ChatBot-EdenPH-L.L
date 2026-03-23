@@ -30,16 +30,11 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        if (e.target.classList.contains('like-btn')) {
+        if (e.target.classList.contains('like-btn') || e.target.classList.contains('dislike-btn')) {
             const question = decodeURIComponent(e.target.dataset.question);
+            const isLike = e.target.classList.contains('like-btn');
 
-            await likeAnswer(question);
-        }
-
-        if (e.target.classList.contains('dislike-btn')) {
-            const question = decodeURIComponent(e.target.dataset.question);
-
-            await dislikeAnswer(question);
+            await likeAnswer(question, isLike);
         }
     });
 
@@ -58,7 +53,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
-async function likeAnswer(question) {
+async function likeAnswer(question, isLike) {
     const { data, error } = await supabaseClient
         .from('informations')
         .select('likes')
@@ -69,56 +64,18 @@ async function likeAnswer(question) {
         console.error("Erreur lors de la récupération des likes :", error);
         return;
     }
+
     else if (data) {
+        const like = isLike ? 1 : -1;
+
         console.log("Nombre actuel de likes :", data.likes);
+
         await supabaseClient
             .from('informations')
-            .update({ likes: data.likes + 1 })
+            .update({ likes: data.likes + like })
             .eq('question', question);
-        console.log("Like ajouté avec succès ! Nouveau nombre de likes :", data.likes + 1);
-    }
 
-    await validationAnswer(question);
-}
-
-async function dislikeAnswer(question) {
-    const { data, error } = await supabaseClient
-        .from('informations')
-        .select('dislikes')
-        .eq('question', question)
-        .single();
-
-    if (error) {
-        console.error("Erreur lors de la récupération des dislikes :", error);
-        return;
-    }
-    else if (data) {
-        console.log("Nombre actuel de dislikes :", data.dislikes);
-        await supabaseClient
-            .from('informations')
-            .update({ dislikes: data.dislikes + 1 })
-            .eq('question', question);
-        console.log("Dislike ajouté avec succès ! Nouveau nombre de dislikes :", data.dislikes + 1);
-    }
-
-    await validationAnswer(question);
-}
-
-async function validationAnswer(question) {
-    const { data, error } = await supabaseClient
-        .from('informations')
-        .select('likes, dislikes')
-        .eq('question', question)
-        .single();
-
-    if (data) {
-        const { likes, dislikes } = data;
-        const totalVotes = likes + dislikes;
-        const validation = totalVotes > 0 && (likes / totalVotes) >= 0.6; // Validation si au moins 60% de likes
-        await supabaseClient
-            .from('informations')
-            .update({ validation: validation })
-            .eq('question', question);
+        console.log("Like ajouté avec succès ! Nouveau nombre de likes :", data.likes + like);
     }
 }
 
